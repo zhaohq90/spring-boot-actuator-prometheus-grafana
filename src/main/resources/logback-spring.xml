@@ -7,134 +7,59 @@
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
     <!--应用名称-->
     <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="springBoot"/>
-    <!--日志文件保存路径-->
-    <property name="LOG_FILE_PATH" value="${LOG_FILE:-${LOG_PATH:-${LOG_TEMP:-${java.io.tmpdir:-/tmp}}}/logs}"/>
+    <!--日志文件保存路径 勿在 LogBack 的配置中使用相对路径-->
+    <springProperty scope="context" name="LOG_FILE_PATH" source="log.file_path" defaultValue="/data/logs"/>
     <!--LogStash访问host-->
-    <springProperty name="LOG_STASH_HOST" scope="context" source="logstash.host" defaultValue="localhost"/>
+    <springProperty name="LOG_STASH_HOST" scope="context" source="logstash.host" defaultValue="localhost:4560"/>
 
-    <!--DEBUG日志输出到文件-->
-    <appender name="FILE_DEBUG"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!--输出DEBUG以上级别日志-->
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>DEBUG</level>
-        </filter>
+    <!-- 彩色日志 -->
+    <!-- 彩色日志依赖的渲染类 -->
+    <conversionRule conversionWord="clr" converterClass="org.springframework.boot.logging.logback.ColorConverter" />
+    <conversionRule conversionWord="wex" converterClass="org.springframework.boot.logging.logback.WhitespaceThrowableProxyConverter" />
+    <conversionRule conversionWord="wEx" converterClass="org.springframework.boot.logging.logback.ExtendedWhitespaceThrowableProxyConverter" />
+    <!-- 彩色日志格式 -->
+    <property name="CONSOLE_LOG_PATTERN" value="${CONSOLE_LOG_PATTERN:-%clr(%d{yyyy-MM-dd HH:mm:ss.SSS}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}) %clr(${PID:- }){magenta} %clr(---){faint} %clr([%15.15t]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}}" />
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %-40.40logger{39} [%-3line] : %msg%n" />
+    <property name="COLOR_LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%boldYellow(%thread)] %highlight(%-5level) %boldGreen(%-40.40logger{39}) [%-3line] : %msg%n" />
+
+    <!--写入日志到控制台的appender,用默认的,但是要去掉charset,否则windows下tomcat下乱码-->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <!--设置为默认的文件日志格式-->
-            <pattern>${FILE_LOG_PATTERN}</pattern>
-            <charset>UTF-8</charset>
+            <!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度,%-4line:行号,%msg：日志消息，%n是换行符-->
+            <pattern>${COLOR_LOG_PATTERN}</pattern>
         </encoder>
+    </appender>
+
+    <!--写入日志到文件的appender-->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <!--设置文件命名格式-->
-            <fileNamePattern>${LOG_FILE_PATH}/debug/${APP_NAME}-%d{yyyy-MM-dd}-%i.log</fileNamePattern>
-            <!--设置日志文件大小，超过就重新生成文件，默认10M-->
-            <maxFileSize>${LOG_FILE_MAX_SIZE:-10MB}</maxFileSize>
-            <!--日志文件保留天数，默认30天-->
-            <maxHistory>${LOG_FILE_MAX_HISTORY:-30}</maxHistory>
+            <!-- rollover daily -->
+            <fileNamePattern>${LOG_FILE_PATH}/%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- each file should be at most 10MB, keep 60 days worth of history, but at most 10GB -->
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>10GB</totalSizeCap>
         </rollingPolicy>
+
+        <encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
+            <!--格式化输出：%d表示日期，%thread表示线程名，%-5level：级别从左显示5个字符宽度,%-4line:行号,%msg：日志消息，%n是换行符-->
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
     </appender>
 
-    <!--ERROR日志输出到文件-->
-    <appender name="FILE_ERROR"
-              class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <!--只输出ERROR级别的日志-->
-        <filter class="ch.qos.logback.classic.filter.LevelFilter">
-            <level>ERROR</level>
-            <onMatch>ACCEPT</onMatch>
-            <onMismatch>DENY</onMismatch>
-        </filter>
-        <encoder>
-            <!--设置为默认的文件日志格式-->
-            <pattern>${FILE_LOG_PATTERN}</pattern>
-            <charset>UTF-8</charset>
-        </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <!--设置文件命名格式-->
-            <fileNamePattern>${LOG_FILE_PATH}/error/${APP_NAME}-%d{yyyy-MM-dd}-%i.log</fileNamePattern>
-            <!--设置日志文件大小，超过就重新生成文件，默认10M-->
-            <maxFileSize>${LOG_FILE_MAX_SIZE:-10MB}</maxFileSize>
-            <!--日志文件保留天数，默认30天-->
-            <maxHistory>${LOG_FILE_MAX_HISTORY:-30}</maxHistory>
-        </rollingPolicy>
-    </appender>
-
-    <!--DEBUG日志输出到LogStash-->
-    <appender name="LOG_STASH_DEBUG" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>DEBUG</level>
-        </filter>
-        <destination>${LOG_STASH_HOST}:4560</destination>
-        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp>
-                    <timeZone>Asia/Shanghai</timeZone>
-                </timestamp>
-                <!--自定义日志输出格式-->
-                <pattern>
-                    <pattern>
-                        {
-                        "project": "mall-tiny",
-                        "level": "%level",
-                        "service": "${APP_NAME:-}",
-                        "pid": "${PID:-}",
-                        "thread": "%thread",
-                        "class": "%logger",
-                        "message": "%message",
-                        "stack_trace": "%exception{20}"
-                        }
-                    </pattern>
-                </pattern>
-            </providers>
-        </encoder>
-        <!--当有多个LogStash服务时，设置访问策略为轮询-->
-        <connectionStrategy>
-            <roundRobin>
-                <connectionTTL>5 minutes</connectionTTL>
-            </roundRobin>
-        </connectionStrategy>
-    </appender>
-
-    <!--ERROR日志输出到LogStash-->
-    <appender name="LOG_STASH_ERROR" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-        <filter class="ch.qos.logback.classic.filter.LevelFilter">
-            <level>ERROR</level>
-            <onMatch>ACCEPT</onMatch>
-            <onMismatch>DENY</onMismatch>
-        </filter>
-        <destination>${LOG_STASH_HOST}:4561</destination>
-        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp>
-                    <timeZone>Asia/Shanghai</timeZone>
-                </timestamp>
-                <!--自定义日志输出格式-->
-                <pattern>
-                    <pattern>
-                        {
-                        "project": "mall-tiny",
-                        "level": "%level",
-                        "service": "${APP_NAME:-}",
-                        "pid": "${PID:-}",
-                        "thread": "%thread",
-                        "class": "%logger",
-                        "message": "%message",
-                        "stack_trace": "%exception{20}"
-                        }
-                    </pattern>
-                </pattern>
-            </providers>
-        </encoder>
-        <!--当有多个LogStash服务时，设置访问策略为轮询-->
-        <connectionStrategy>
-            <roundRobin>
-                <connectionTTL>5 minutes</connectionTTL>
-            </roundRobin>
-        </connectionStrategy>
+    <!--异步到文件-->
+    <appender name="asyncFileAppender" class="ch.qos.logback.classic.AsyncAppender">
+        <!-- 不丢失日志.默认的,如果队列的80%已满,则会丢弃TRACT、DEBUG、INFO级别的日志 -->
+        <discardingThreshold>0</discardingThreshold>
+        <!-- 更改默认的队列的深度,该值会影响性能.默认值为256 -->
+        <queueSize>500</queueSize>
+        <!-- 添加附加的appender,最多只能添加一个 -->
+        <appender-ref ref="FILE"/>
     </appender>
 
     <!--业务日志输出到LogStash-->
-    <appender name="LOG_STASH_BUSINESS" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-        <destination>${LOG_STASH_HOST}:4562</destination>
+    <appender name="LOG_STASH" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
+        <destination>${LOG_STASH_HOST}</destination>
         <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>
                 <timestamp>
@@ -144,7 +69,7 @@
                 <pattern>
                     <pattern>
                         {
-                        "project": "mall-tiny",
+                        "project": "spring-boot",
                         "level": "%level",
                         "service": "${APP_NAME:-}",
                         "pid": "${PID:-}",
@@ -152,36 +77,6 @@
                         "class": "%logger",
                         "message": "%message",
                         "stack_trace": "%exception{20}"
-                        }
-                    </pattern>
-                </pattern>
-            </providers>
-        </encoder>
-        <!--当有多个LogStash服务时，设置访问策略为轮询-->
-        <connectionStrategy>
-            <roundRobin>
-                <connectionTTL>5 minutes</connectionTTL>
-            </roundRobin>
-        </connectionStrategy>
-    </appender>
-
-    <!--接口访问记录日志输出到LogStash-->
-    <appender name="LOG_STASH_RECORD" class="net.logstash.logback.appender.LogstashTcpSocketAppender">
-        <destination>${LOG_STASH_HOST}:4563</destination>
-        <encoder charset="UTF-8" class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp>
-                    <timeZone>Asia/Shanghai</timeZone>
-                </timestamp>
-                <!--自定义日志输出格式-->
-                <pattern>
-                    <pattern>
-                        {
-                        "project": "mall-tiny",
-                        "level": "%level",
-                        "service": "${APP_NAME:-}",
-                        "class": "%logger",
-                        "message": "%message"
                         }
                     </pattern>
                 </pattern>
@@ -196,25 +91,13 @@
     </appender>
 
     <!--控制框架输出日志-->
-    <logger name="org.slf4j" level="INFO"/>
-    <logger name="springfox" level="INFO"/>
-    <logger name="io.swagger" level="INFO"/>
     <logger name="org.springframework" level="INFO"/>
     <logger name="org.hibernate.validator" level="INFO"/>
 
     <root level="DEBUG">
         <appender-ref ref="CONSOLE"/>
-        <!--<appender-ref ref="FILE_DEBUG"/>-->
-        <!--<appender-ref ref="FILE_ERROR"/>-->
-        <appender-ref ref="LOG_STASH_DEBUG"/>
-        <appender-ref ref="LOG_STASH_ERROR"/>
+        <appender-ref ref="LOG_STASH"/>
+        <appender-ref ref="asyncFileAppender"/>
     </root>
 
-    <logger name="com.itmuch.actuator.prometheus.demo" level="DEBUG">
-        <appender-ref ref="LOG_STASH_RECORD"/>
-    </logger>
-
-    <logger name="com.macro.mall" level="DEBUG">
-        <appender-ref ref="LOG_STASH_BUSINESS"/>
-    </logger>
 </configuration>

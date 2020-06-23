@@ -39,6 +39,3 @@ services:
       - elasticsearch:es #可以用es这个域名访问elasticsearch服务
     ports:
       - 4560:4560
-      - 4561:4561
-      - 4562:4562
-      - 4563:4563

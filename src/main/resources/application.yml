@@ -13,4 +13,4 @@ management:
       application: ${spring.application.name}
 
 logstash:
-  host: localhost
+  host: localhost:4560
