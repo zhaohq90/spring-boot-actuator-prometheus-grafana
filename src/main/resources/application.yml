@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8089
 spring:
   application:
     name: prometheus-test
@@ -12,3 +12,5 @@ management:
     tags:
       application: ${spring.application.name}
 
+logstash:
+  host: localhost
