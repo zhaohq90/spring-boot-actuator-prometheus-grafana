@@ -93,6 +93,7 @@
     <!--控制框架输出日志-->
     <logger name="org.springframework" level="INFO"/>
     <logger name="org.hibernate.validator" level="INFO"/>
+    <logger name="org.apache.coyote.http11.Http11InputBuffer" level="DEBUG"/>
 
     <root level="DEBUG">
         <appender-ref ref="CONSOLE"/>
